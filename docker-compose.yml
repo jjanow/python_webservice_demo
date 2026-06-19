@@ -1,0 +1,29 @@
+# Before running `docker compose up`, copy .env.example to .env and fill in
+# real values (SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, etc.):
+#   cp .env.example .env
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Overrides .env's DATABASE_URL so the SQLite file lives on the
+      # persistent volume mounted below rather than the ephemeral
+      # container filesystem.
+      DATABASE_URL: sqlite+aiosqlite:////app/data/app.db
+    volumes:
+      - app_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live').read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  app_data:

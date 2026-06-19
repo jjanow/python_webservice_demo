@@ -1,0 +1,32 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends()/Query()/Path()/Security() defaults are the framework's
+# sanctioned idiom, not the mutable-default-argument footgun B008 exists to
+# catch. This keeps B008 active for genuinely mutable defaults elsewhere.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Security",
+    "app.dependencies.require_role",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# main.py's first import block intentionally configures logging before any
+# other app import runs (see the E402s already in that file) -- letting ruff
+# reorder it would break that guarantee, so import-sorting is exempted here.
+"app/main.py" = ["I001"]
+# UserRole/OrderStatus deliberately inherit from (str, enum.Enum) rather than
+# enum.StrEnum; that's an existing, working modeling choice, not a bug, so it
+# is exempted from the StrEnum modernization suggestion rather than changed.
+"app/models.py" = ["UP042"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
