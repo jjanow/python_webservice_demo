@@ -78,8 +78,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         elapsed = time.perf_counter() - start
 
+        # Use the matched route's path *template* (e.g. /products/{product_id})
+        # so each parameterized route is a single time series. Unmatched
+        # requests (404s) are bucketed under a constant rather than their raw
+        # path, otherwise an attacker hitting random URLs could create unbounded
+        # label cardinality and exhaust memory.
         route = request.scope.get("route")
-        path_template = route.path if route is not None else request.url.path
+        path_template = route.path if route is not None else "<unmatched>"
 
         REQUEST_COUNT.labels(
             method=request.method, path=path_template, status_code=response.status_code

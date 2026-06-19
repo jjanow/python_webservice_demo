@@ -1,6 +1,5 @@
 """SQLAlchemy ORM models for the Inventory & Orders domain."""
 import enum
-import uuid
 from datetime import datetime
 from decimal import Decimal
 
@@ -29,10 +28,6 @@ class OrderStatus(str, enum.Enum):
     PAID = "paid"
     SHIPPED = "shipped"
     CANCELLED = "cancelled"
-
-
-def _uuid_str() -> str:
-    return str(uuid.uuid4())
 
 
 class User(Base):

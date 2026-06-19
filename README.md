@@ -62,9 +62,9 @@ Full request/response schemas are in the auto-generated docs at `/docs` once the
 
 - Passwords hashed with `bcrypt` directly (not via `passlib`, which is incompatible with `bcrypt>=4.1`). Since bcrypt silently truncates input past 72 bytes instead of erroring, password input is explicitly rejected above 72 UTF-8 bytes rather than being silently weakened.
 - JWTs signed with `PyJWT` (chosen over `python-jose`, which is unmaintained and has had algorithm-confusion CVEs).
-- `SECRET_KEY` is required to be a real value (not empty/placeholder) whenever `ENVIRONMENT=production` — the app refuses to start otherwise.
+- `SECRET_KEY` **and** `ADMIN_PASSWORD` are both required to be real values (not empty/placeholder, and the password at least 8 chars) whenever `ENVIRONMENT=production` — the app refuses to start otherwise, so a strong signing key can't be undermined by a default admin password.
 - Closed-by-default CORS (`CORS_ORIGINS` is empty unless configured) and a standard set of security response headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`).
-- `/auth/login` is rate-limited (5/min/IP) against brute-force; failed logins return the same generic message whether the email exists or not.
+- `/auth/login` is rate-limited (5/min/IP) against brute-force; failed logins return the same generic message whether the email exists or not, and a dummy bcrypt verification runs even for missing/inactive accounts so response timing can't be used to enumerate valid emails.
 - Every response carries an `X-Request-ID` header (generated if the client doesn't supply one), and logs are single-line JSON tagged with that request ID, so a request can be traced across a log stream.
 - Every error response (validation, HTTP errors, and unhandled exceptions) is shaped consistently as `{"error": {"code": ..., "message": ...}}`; unhandled exceptions are logged with a full traceback server-side but only return a generic message to the client.
 
@@ -73,7 +73,9 @@ Full request/response schemas are in the auto-generated docs at `/docs` once the
 This is a demo, and a few corners were deliberately cut for simplicity rather than by oversight — worth naming explicitly:
 
 - **Schema migrations**: tables are created with `Base.metadata.create_all` on startup. A real deployment with an evolving schema needs **Alembic** migrations instead.
-- **Rate limiting**: `slowapi`'s in-memory backend only works correctly for a single process/instance. Running more than one replica needs a shared backend (**Redis**).
+- **Rate limiting**: `slowapi`'s in-memory backend only works correctly for a single process/instance. Running more than one replica needs a shared backend (**Redis**). The limiter also keys off `request.client.host`; behind a TLS-terminating reverse proxy that is the proxy's IP, so the per-IP limit effectively becomes global. A production deployment should terminate TLS via a trusted proxy and configure the key function to read a validated `X-Forwarded-For`.
+- **Public OpenAPI docs**: `/docs` and `/openapi.json` are unauthenticated, which is convenient for a demo but exposes the full API surface. A production deployment would gate or disable them.
+- **Public `/metrics`**: the Prometheus endpoint is unauthenticated and should be restricted to the scraping network (or put behind auth) in production. Unmatched request paths are bucketed under a single `<unmatched>` label so random 404 traffic can't explode metric cardinality.
 - **Database**: SQLite is fine for a single-instance demo; a real deployment with concurrent writers should use **PostgreSQL** (the async SQLAlchemy layer makes that mostly a `DATABASE_URL` change plus swapping `aiosqlite` for `asyncpg`).
 - **No refresh tokens**: only short-lived access tokens are issued; a production app would likely add refresh tokens / token revocation.
 - **No row-level locking on stock**: two concurrent order requests could both pass the stock check before either decrements it, allowing overselling. SQLite serializes writes so this doesn't surface in this demo, but the production fix is `SELECT ... FOR UPDATE` row locking on Postgres around the stock check-and-decrement.

@@ -39,3 +39,14 @@ async def test_metrics_endpoint_exposes_prometheus_text(client: AsyncClient):
     resp = await client.get("/metrics")
     assert resp.status_code == 200
     assert "http_requests_total" in resp.text
+
+
+async def test_unmatched_paths_are_bucketed_in_metrics(client: AsyncClient):
+    # Random 404 paths must not each become their own metric label, or an
+    # attacker could exhaust memory via unbounded label cardinality.
+    await client.get("/totally-fake-route-aaa")
+    await client.get("/totally-fake-route-bbb")
+    resp = await client.get("/metrics")
+    assert "<unmatched>" in resp.text
+    assert "totally-fake-route-aaa" not in resp.text
+    assert "totally-fake-route-bbb" not in resp.text

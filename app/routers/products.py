@@ -4,6 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -86,7 +87,13 @@ async def create_product(
 
     product = Product(**payload.model_dump())
     db.add(product)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="SKU already exists"
+        ) from None
     await db.refresh(product)
     return product
 
@@ -111,7 +118,13 @@ async def update_product(
     for field, value in updates.items():
         setattr(product, field, value)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="SKU already exists"
+        ) from None
     await db.refresh(product)
     return product
 

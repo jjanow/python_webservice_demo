@@ -123,14 +123,23 @@ class ProductListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Upper bound on a single line's quantity. Kept well below the point where
+# unit_price * quantity could overflow the Numeric(10, 2) total column for any
+# realistically-priced product, and prevents absurd single-line requests.
+MAX_ORDER_ITEM_QUANTITY = 1_000_000
+# Cap distinct line items per order so a single request can't enqueue an
+# unbounded amount of work / rows.
+MAX_ORDER_ITEMS = 100
+
+
 class OrderItemCreate(BaseModel):
     product_id: int
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=MAX_ORDER_ITEM_QUANTITY)
 
 
 class OrderCreate(BaseModel):
     customer_id: int
-    items: list[OrderItemCreate] = Field(min_length=1)
+    items: list[OrderItemCreate] = Field(min_length=1, max_length=MAX_ORDER_ITEMS)
 
     @field_validator("items")
     @classmethod

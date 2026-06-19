@@ -284,3 +284,22 @@ async def test_list_orders_filter_by_status_and_customer_id(
 async def test_get_nonexistent_order_returns_404(staff_client: AsyncClient):
     resp = await staff_client.get("/orders/999999")
     assert resp.status_code == 404
+
+
+async def test_order_item_quantity_over_max_returns_422(
+    admin_client: AsyncClient, staff_client: AsyncClient
+):
+    customer = await _make_customer(admin_client, email="qtymax@example.com")
+    product = await _make_product(admin_client, "QTYMAX-1", "1.00", 10)
+    resp = await _create_single_item_order(
+        staff_client, customer["id"], product["id"], quantity=1_000_001
+    )
+    assert resp.status_code == 422
+
+
+async def test_order_with_too_many_line_items_returns_422(staff_client: AsyncClient):
+    # 101 distinct line items exceeds MAX_ORDER_ITEMS (100); rejected at the
+    # schema layer before any DB lookup, so the products needn't exist.
+    items = [{"product_id": i, "quantity": 1} for i in range(1, 102)]
+    resp = await _create_order(staff_client, 1, items)
+    assert resp.status_code == 422

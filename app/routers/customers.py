@@ -1,6 +1,7 @@
 """Customer management endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -62,7 +63,13 @@ async def create_customer(
 
     customer = Customer(**payload.model_dump())
     db.add(customer)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already exists"
+        ) from None
     await db.refresh(customer)
     return customer
 
@@ -87,7 +94,13 @@ async def update_customer(
     for field, value in updates.items():
         setattr(customer, field, value)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already exists"
+        ) from None
     await db.refresh(customer)
     return customer
 

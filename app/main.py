@@ -73,10 +73,14 @@ def create_app() -> FastAPI:
     # registration order to the request, so the last one added runs first.
     # We want request-id assigned first (so logs during this request have it),
     # then security headers, then metrics, then CORS innermost.
+    # This API authenticates with bearer tokens in the Authorization header,
+    # not cookies, so allow_credentials stays False. Keeping it False also
+    # avoids the well-known browser rejection of `allow_credentials=True`
+    # combined with a wildcard origin, should one ever be configured.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )

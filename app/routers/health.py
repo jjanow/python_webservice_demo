@@ -1,5 +1,6 @@
 """Liveness/readiness probes and Prometheus metrics exposition. No auth required."""
 from fastapi import APIRouter, Depends, Response
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,12 +22,11 @@ async def readiness(db: AsyncSession = Depends(get_db)) -> Response:
     try:
         await db.execute(text("SELECT 1"))
     except SQLAlchemyError:
-        return Response(
-            content='{"status": "error", "detail": "database unavailable"}',
+        return JSONResponse(
+            content={"status": "error", "detail": "database unavailable"},
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            media_type="application/json",
         )
-    return Response(content='{"status": "ok"}', media_type="application/json")
+    return JSONResponse(content={"status": "ok"})
 
 
 @router.get("/metrics")
